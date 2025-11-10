@@ -1,0 +1,3 @@
+recursive-include pretix_congressschedule/static *
+recursive-include pretix_congressschedule/templates *
+recursive-include pretix_congressschedule/locale *

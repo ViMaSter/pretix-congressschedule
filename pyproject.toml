@@ -1,0 +1,39 @@
+[project]
+name = "pretix-congressschedule"
+dynamic = ["version"]
+description = "c3voc schedule-compatible schedule.xml endpoint"
+readme = "README.rst"
+requires-python = ">=3.9"
+license = {file = "LICENSE"}
+keywords = ["pretix"]
+authors = [
+    {name = "Vincent Mahnke", email = "pretix-congress@vincent.mahn.ke"},
+]
+maintainers = [
+    {name = "Vincent Mahnke", email = "pretix-congress@vincent.mahn.ke"},
+]
+
+[project.entry-points."pretix.plugin"]
+congressschedule = "pretix_congressschedule:PretixPluginMeta"
+
+[project.entry-points."distutils.commands"]
+build = "pretix_plugin_build.build:CustomBuild"
+
+[build-system]
+requires = [
+    "setuptools",
+    "pretix-plugin-build"
+]
+
+[project.urls]
+homepage = "https://git.hamburg.ccc.de/ViMaSter/pretix-congressschedule"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.dynamic]
+version = {attr = "pretix_congressschedule.__version__"}
+
+[tool.setuptools.packages.find]
+include = ["pretix*"]
+namespaces = false
