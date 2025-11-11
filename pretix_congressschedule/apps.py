@@ -12,7 +12,7 @@ class PassbookApp(AppConfig):
     class PretixPluginMeta:
         name = gettext_lazy("Congress Schedule")
         author = "Vincent Mahnke"
-        description = gettext_lazy("Provides passbook tickets for pretix")
+        description = gettext_lazy("Provides c3voc-schedule compatible XML files")
         category = "API"
         visible = True
         featured = True

@@ -22,5 +22,5 @@ msgid "Congress Schedule"
 msgstr ""
 
 #: pretix_congressschedule/__init__.py:13
-msgid "Provides passbook tickets for pretix"
+msgid "Provides c3voc-schedule compatible XML files"
 msgstr ""
