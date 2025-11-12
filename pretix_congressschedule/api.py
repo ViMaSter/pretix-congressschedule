@@ -191,3 +191,101 @@ class CongressScheduleView(views.APIView):
 
         xml_bytes = ET.tostring(root, encoding='utf-8', xml_declaration=True)
         return HttpResponse(xml_bytes, content_type='application/xml')
+    
+
+class HackertoursMarkdownView(views.APIView):
+    def get(self, request, organizer, event, *args, **kwargs):
+        try:
+            ev = Event.objects.get(organizer__slug=organizer, slug=event)
+        except Event.DoesNotExist:
+            return HttpResponse("Event not found", status=404, content_type='text/plain; charset=utf-8')
+
+        if not ev.has_subevents:
+            return HttpResponse(
+                'Event is not an event-series: https://docs.pretix.eu/guides/event-series/?h=dates#how-to-create-an-event-series',
+                status=400,
+                content_type='text/plain; charset=utf-8'
+            )
+
+        subs = SubEvent.objects.filter(event=ev).order_by('date_from')
+
+        # Helper: localize strings
+        def _localize(val):
+            if hasattr(val, 'localize'):
+                try:
+                    return val.localize(ev.settings.locale)
+                except Exception:
+                    return str(val)
+            return str(val) if val is not None else ''
+
+        # Slugify for links
+        def slugify(text: str) -> str:
+            text = (text or '').lower()
+            text = re.sub(r'\s+', '-', text)
+            text = re.sub(r'[^a-z0-9\-_]', '', text)
+            text = text.strip('-_')
+            return text or 'item'
+
+        # Build day -> events map and gather all start times
+        days = defaultdict(list)  # {date -> [SubEvent]}
+        start_dts = []
+        for se in subs:
+            if not se.date_from:
+                continue
+            days[se.date_from.date()].append(se)
+            start_dts.append(se.date_from)
+
+        if not start_dts:
+            return HttpResponse("No subevents found", content_type='text/plain; charset=utf-8')
+
+        unique_days = sorted(days.keys())
+
+        # Build time slots (minutes since midnight)
+        def to_minutes(dt):
+            return dt.hour * 60 + dt.minute
+
+        event_minutes = {to_minutes(dt) for dt in start_dts}
+        min_hour = min(dt.hour for dt in start_dts)
+        max_hour = max(dt.hour for dt in start_dts)
+        hour_minutes = {h * 60 for h in range(min_hour, max_hour + 1)}
+        all_minutes = sorted(event_minutes | hour_minutes)
+
+        # For each day, map minute -> list of markdown items
+        day_slots = {d: defaultdict(list) for d in unique_days}
+        for d in unique_days:
+            for se in days[d]:
+                title = _localize(se.name)
+                tmin = to_minutes(se.date_from)
+                hhmm = se.date_from.strftime('%H:%M')
+                try:
+                    se_settings = getattr(se, 'settings', None)
+                    lang = se_settings.get('congressschedule_language', 'de') if se_settings is not None else 'none'
+                except Exception:
+                    lang = 'none'
+                link = f"./{slugify(title)}/"
+                md_item = f"{hhmm} [{title}]({link}) {{< lang {lang} >}}"
+                day_slots[d][tmin].append(md_item)
+
+        # Build markdown table
+        lines = []
+        # Header
+        header = ["Zeit"] + [f"Tag {i} ({d.strftime('%d.%m.')})" for i, d in enumerate(unique_days, start=1)]
+        lines.append("| " + " | ".join(header) + " |")
+        lines.append("|" + "|".join(["---"] * len(header)) + "|")
+
+        # Rows
+        for m in all_minutes:
+            is_full_hour = (m % 60) == 0
+            zeit_label = f"{m // 60:02d}:{m % 60:02d}" if is_full_hour else ""
+            row = [zeit_label]
+            for d in unique_days:
+                items = day_slots[d].get(m, [])
+                if items:
+                    cell = "  ".join(items)
+                else:
+                    cell = "-" if is_full_hour else ""
+                row.append(cell)
+            lines.append("| " + " | ".join(row) + " |")
+
+        md = "\n".join(lines) + "\n"
+        return HttpResponse(md.encode('utf-8'), content_type='text/markdown; charset=utf-8')
