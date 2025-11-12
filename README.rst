@@ -62,6 +62,21 @@ Development setup
 6. Restart your local pretix server. You can now use the plugin from this repository for your events by enabling it in
    the 'plugins' tab in the settings.
 
+
+Changelog
+---------
+
+1.1.0
+~~~~~
+
+- Add subevent-level "Language" field and use it to emit ``<language>`` per subevent (defaults to ``none``).
+
+1.0.0
+~~~~~
+
+- Initial release
+
+
 License
 -------
 

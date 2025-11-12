@@ -1,6 +1,10 @@
 from django.http import HttpResponse
 from rest_framework import views
 from pretix.base.models import Event, SubEvent
+try:
+    from pretix.base.models import SubEventMetaValue
+except Exception:  # pragma: no cover
+    SubEventMetaValue = None
 import xml.etree.ElementTree as ET
 from collections import defaultdict
 from datetime import timedelta
@@ -182,10 +186,31 @@ class CongressScheduleView(views.APIView):
                     # track – use room name as a simple track assignment
                     ET.SubElement(ev_el, 'track').text = slugify(room_name) or 'general'
 
-                    # Optional elements: keep minimal but include language if available
-                    lang = getattr(ev.settings, 'locale', None)
-                    if lang:
-                        ET.SubElement(ev_el, 'language').text = str(lang)
+                    # Optional elements: language – per subevent via SubEventMetaValue
+                    def _get_lang(subevent: SubEvent) -> str:
+                        if SubEventMetaValue is not None:
+                            try:
+                                v = (
+                                    SubEventMetaValue.objects
+                                    .filter(subevent=subevent, key='congressschedule_language')
+                                    .values_list('value', flat=True)
+                                    .first()
+                                )
+                                return (v or 'none').strip() or 'none'
+                            except Exception:
+                                pass
+                        # Fallbacks for environments without pretix DB access
+                        md = getattr(subevent, 'meta_data', None) or {}
+                        if isinstance(md, dict) and 'congressschedule_language' in md:
+                            return (md.get('congressschedule_language') or 'none')
+                        se_settings = getattr(subevent, 'settings', None)
+                        try:
+                            return se_settings.get('congressschedule_language', 'none') if se_settings is not None else 'none'
+                        except Exception:
+                            return 'none'
+
+                    lang = _get_lang(se)
+                    ET.SubElement(ev_el, 'language').text = str(lang or 'none')
 
                     # Leave optional complex children (persons, recording, links, attachments) empty for now
 
@@ -257,11 +282,13 @@ class HackertoursMarkdownView(views.APIView):
                 title = _localize(se.name)
                 tmin = to_minutes(se.date_from)
                 hhmm = se.date_from.strftime('%H:%M')
-                try:
-                    se_settings = getattr(se, 'settings', None)
-                    lang = se_settings.get('congressschedule_language', 'de') if se_settings is not None else 'none'
-                except Exception:
-                    lang = 'none'
+                v = (
+                    SubEventMetaValue.objects
+                    .filter(subevent=se, property__name='congressschedule_language')
+                    .values_list('value', flat=True)
+                    .first()
+                )
+                lang = (v or 'deen').strip() or 'deen'
                 link = f"./{slugify(title)}/"
                 md_item = f"{hhmm} [{title}]({link}) {{< lang {lang} >}}"
                 day_slots[d][tmin].append(md_item)
