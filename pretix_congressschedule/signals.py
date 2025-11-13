@@ -43,7 +43,7 @@ class SubEventLanguageForm(forms.Form):
 	def save(self):
 		if not self.subevent:
 			return
-		val = (self.cleaned_data.get('language') or '').strip() or 'none'
+		val = (self.cleaned_data.get('language') or '').strip() or 'deen'
 		# Persist as real subevent meta value so it's scoped per subevent
 		from pretix.base.models import EventMetaProperty
 

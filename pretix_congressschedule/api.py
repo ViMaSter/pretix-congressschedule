@@ -196,21 +196,21 @@ class CongressScheduleView(views.APIView):
                                     .values_list('value', flat=True)
                                     .first()
                                 )
-                                return (v or 'none').strip() or 'none'
+                                return (v or 'deen').strip() or 'deen'
                             except Exception:
                                 pass
                         # Fallbacks for environments without pretix DB access
                         md = getattr(subevent, 'meta_data', None) or {}
                         if isinstance(md, dict) and 'congressschedule_language' in md:
-                            return (md.get('congressschedule_language') or 'none')
+                            return (md.get('congressschedule_language') or 'deen')
                         se_settings = getattr(subevent, 'settings', None)
                         try:
-                            return se_settings.get('congressschedule_language', 'none') if se_settings is not None else 'none'
+                            return se_settings.get('congressschedule_language', 'deen') if se_settings is not None else 'deen'
                         except Exception:
-                            return 'none'
+                            return 'deen'
 
                     lang = _get_lang(se)
-                    ET.SubElement(ev_el, 'language').text = str(lang or 'none')
+                    ET.SubElement(ev_el, 'language').text = str(lang or 'deen')
 
                     # Leave optional complex children (persons, recording, links, attachments) empty for now
 

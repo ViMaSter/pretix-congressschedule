@@ -66,10 +66,15 @@ Development setup
 Changelog
 ---------
 
+1.1.1
+~~~~~
+
+- ``<language>`` defaults to ``deen`` across XML and Markdown outputs.
+
 1.1.0
 ~~~~~
 
-- Add subevent-level "Language" field and use it to emit ``<language>`` per subevent (defaults to ``none``).
+- Add subevent-level "Language" field and use it to emit ``<language>`` per subevent (defaults to ``deen``).
 
 1.0.0
 ~~~~~
