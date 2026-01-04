@@ -1,5 +1,5 @@
 from django.urls import path
-from .api import CongressScheduleXMLView, HackertoursMarkdownView
+from .api import CongressScheduleXMLView, CongressScheduleJSONView, HackertoursMarkdownView
 
 urlpatterns = [
     path(
