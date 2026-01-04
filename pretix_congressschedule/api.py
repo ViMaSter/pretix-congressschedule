@@ -240,34 +240,43 @@ class CongressScheduleJSONView(views.APIView):
         subs = SubEvent.objects.filter(event=ev).order_by('date_from')
 
         schedule = {
-            "generator": {"name": "voc/schedule/hackertours", "version": __version__},
-            "version": f"{ev.slug}-v1",
-            "conference": {
-                "acronym": f"{organizer}_{event}".lower(),
-                "title": (ev.name.localize(ev.settings.locale) if hasattr(ev.name, 'localize') else str(ev.name)) or str(ev.slug),
-                "start": None,
-                "end": None,
-                "daysCount": None,
-                "timeslot_duration": "00:15",
-                "time_zone_name": "Europe/Berlin",
-            },
-            "days": []
+            "$schema": "https://c3voc.de/schedule/schema.json",
+            "schedule": {
+                "generator": {"name": "voc/schedule/hackertours", "version": __version__},
+                "version": f"{ev.slug}-v1",
+                "conference": {
+                    "acronym": f"{organizer}_{event}".lower(),
+                    "title": (ev.name.localize(ev.settings.locale) if hasattr(ev.name, 'localize') else str(ev.name)) or str(ev.slug),
+                    "start": None,
+                    "end": None,
+                    "daysCount": None,
+                    "timeslot_duration": "00:15",
+                    "time_zone_name": "Europe/Berlin",
+                    "rooms": [
+                        {
+                        "name": "Hackertours",
+                        "guid": "aa56c6c6-7dbc-4f73-b189-b8ee2245b0c3"
+                        }
+                    ],
+                    "days": []
+                }
+            }
         }
 
         all_starts = [se.date_from for se in subs if se.date_from]
         all_ends = [se.date_to for se in subs if se.date_to]
         if all_starts:
-            schedule["conference"]["start"] = min(all_starts).isoformat()
+            schedule["schedule"]["conference"]["start"] = min(all_starts).isoformat()
         if all_ends:
-            schedule["conference"]["end"] = max(all_ends).isoformat()
+            schedule["schedule"]["conference"]["end"] = max(all_ends).isoformat()
 
         unique_days = sorted({(se.date_from.date() if se.date_from else None) for se in subs} - {None})
         if unique_days:
-            schedule["conference"]["days"] = len(unique_days)
+            schedule["schedule"]["conference"]["daysCount"] = len(unique_days)
 
         tz_name = getattr(ev, 'timezone', None) or getattr(ev.settings, 'timezone', None)
         if tz_name:
-            schedule["conference"]["time_zone_name"] = tz_name if isinstance(tz_name, str) else str(tz_name)
+            schedule["schedule"]["conference"]["time_zone_name"] = tz_name if isinstance(tz_name, str) else str(tz_name)
 
         days = defaultdict(lambda: defaultdict(list))
 
@@ -280,7 +289,7 @@ class CongressScheduleJSONView(views.APIView):
                     txt = str(loc)
             else:
                 txt = str(loc) if loc else ''
-            return (txt or 'Main').strip() or 'Main'
+            return (txt or 'Hackertours').strip() or 'Hackertours'
 
         for se in subs:
             if not se.date_from:
@@ -389,7 +398,7 @@ class CongressScheduleJSONView(views.APIView):
 
                 day_obj["rooms"][room_name] = room_events
 
-            schedule["days"].append(day_obj)
+            schedule["schedule"]["conference"]["days"].append(day_obj)
 
         return HttpResponse(
             json.dumps(schedule, ensure_ascii=False),
