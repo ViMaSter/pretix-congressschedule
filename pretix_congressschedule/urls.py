@@ -8,9 +8,9 @@ urlpatterns = [
         name='schedule-xml',
     ),
     path(
-        'api/v1/event/<str:organizer>/<str:event>/schedule.xml',
+        'api/v1/event/<str:organizer>/<str:event>/schedule.json',
         CongressScheduleJSONView.as_view(),
-        name='schedule-xml',
+        name='schedule-json',
     ),
     path(
         'api/v1/event/<str:organizer>/<str:event>/schedule.md',
