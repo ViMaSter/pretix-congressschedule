@@ -217,7 +217,7 @@ class CongressScheduleJSONView(views.APIView):
                         "duration": dur_txt,
                         "room": room_name,
                         "slug": f"{base}-{second}",
-                        "url": "TODO",
+                        "url": websiteDE if language == "de" else websiteEN,
                         "title": title,
                         "subtitle": "",
                         "track": "Hackertours",
@@ -225,17 +225,21 @@ class CongressScheduleJSONView(views.APIView):
                         "language": str(language or "de, en"),
                         "abstract": se.frontpage_text.localize(ev.settings.locale) if hasattr(se.frontpage_text, 'localize') else str(se.frontpage_text) if se.frontpage_text else "",
                         "persons": [],
-                        "links": [
-                            {
-                                "url": str(websiteDE),
-                                "title": title + " (DE)",
-                            },
-                            {
-                                "url": str(websiteEN),
-                                "title": title + " (DE)",
-                            }
-                        ],
+                        "links": []
                     }
+
+                    if websiteDE:
+                        ev_obj["links"].append({
+                            "url": str(websiteDE),
+                            "title": title + " (DE)",
+                        })
+
+                    if websiteEN:
+                        ev_obj["links"].append({
+                            "url": str(websiteEN),
+                            "title": title + " (EN)",
+                        })
+                        
                     room_events.append(ev_obj)
 
                 day_obj["rooms"][room_name] = room_events
