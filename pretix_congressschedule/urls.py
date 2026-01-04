@@ -1,10 +1,15 @@
 from django.urls import path
-from .api import CongressScheduleView, HackertoursMarkdownView
+from .api import CongressScheduleXMLView, HackertoursMarkdownView
 
 urlpatterns = [
     path(
         'api/v1/event/<str:organizer>/<str:event>/schedule.xml',
-        CongressScheduleView.as_view(),
+        CongressScheduleXMLView.as_view(),
+        name='schedule-xml',
+    ),
+    path(
+        'api/v1/event/<str:organizer>/<str:event>/schedule.xml',
+        CongressScheduleJSONView.as_view(),
         name='schedule-xml',
     ),
     path(

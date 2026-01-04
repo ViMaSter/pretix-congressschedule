@@ -12,8 +12,9 @@ import uuid
 import re
 
 from . import __version__
+import json
 
-class CongressScheduleView(views.APIView):
+class CongressScheduleXMLView(views.APIView):
     def get(self, request, organizer, event, *args, **kwargs):
         try:
             ev = Event.objects.get(organizer__slug=organizer, slug=event)
@@ -216,7 +217,184 @@ class CongressScheduleView(views.APIView):
 
         xml_bytes = ET.tostring(root, encoding='utf-8', xml_declaration=True)
         return HttpResponse(xml_bytes, content_type='application/xml')
-    
+
+class CongressScheduleJSONView(views.APIView):
+    def get(self, request, organizer, event):
+
+        try:
+            ev = Event.objects.get(organizer__slug=organizer, slug=event)
+        except Event.DoesNotExist:
+            return HttpResponse(
+                json.dumps({"error": "Event not found"}),
+                status=404,
+                content_type='application/json; charset=utf-8'
+            )
+
+        if not ev.has_subevents:
+            return HttpResponse(
+                json.dumps({"error": "Event is not an event-series: https://docs.pretix.eu/guides/event-series/?h=dates#how-to-create-an-event-series"}),
+                status=400,
+                content_type='application/json; charset=utf-8'
+            )
+
+        subs = SubEvent.objects.filter(event=ev).order_by('date_from')
+
+        schedule = {
+            "generator": {"name": "pretix-congressschedule", "version": __version__},
+            "url": None,
+            "version": f"{ev.slug}-v1",
+            "conference": {
+                "title": (ev.name.localize(ev.settings.locale) if hasattr(ev.name, 'localize') else str(ev.name)) or str(ev.slug),
+                "acronym": f"{organizer}_{event}".lower(),
+                "start": None,
+                "end": None,
+                "days": None,
+                "time_zone_name": None,
+            },
+            "days": []
+        }
+
+        try:
+            schedule["url"] = request.build_absolute_uri()
+        except Exception:
+            pass
+
+        all_starts = [se.date_from for se in subs if se.date_from]
+        all_ends = [se.date_to for se in subs if se.date_to]
+        if all_starts:
+            schedule["conference"]["start"] = min(all_starts).isoformat()
+        if all_ends:
+            schedule["conference"]["end"] = max(all_ends).isoformat()
+
+        unique_days = sorted({(se.date_from.date() if se.date_from else None) for se in subs} - {None})
+        if unique_days:
+            schedule["conference"]["days"] = len(unique_days)
+
+        tz_name = getattr(ev, 'timezone', None) or getattr(ev.settings, 'timezone', None)
+        if tz_name:
+            schedule["conference"]["time_zone_name"] = tz_name if isinstance(tz_name, str) else str(tz_name)
+
+        days = defaultdict(lambda: defaultdict(list))
+
+        def get_room_name(se):
+            loc = getattr(se, 'location', None)
+            if hasattr(loc, 'localize'):
+                try:
+                    txt = loc.localize(ev.settings.locale)
+                except Exception:
+                    txt = str(loc)
+            else:
+                txt = str(loc) if loc else ''
+            return (txt or 'Main').strip() or 'Main'
+
+        for se in subs:
+            if not se.date_from:
+                continue
+            day_key = se.date_from.date()
+            room = get_room_name(se)
+            days[day_key][room].append(se)
+
+        def _localize(val):
+            if hasattr(val, 'localize'):
+                try:
+                    return val.localize(ev.settings.locale)
+                except Exception:
+                    return str(val)
+            return str(val) if val is not None else ''
+
+        def slugify(text: str) -> str:
+            text = (text or '').lower()
+            text = re.sub(r'\s+', '-', text)
+            text = re.sub(r'[^a-z0-9\-_]', '', text)
+            text = text.strip('-_')
+            return text or 'item'
+
+        def _get_lang(subevent: SubEvent) -> str:
+            if SubEventMetaValue is not None:
+                try:
+                    v = (
+                        SubEventMetaValue.objects
+                        .filter(subevent=subevent, key='congressschedule_language')
+                        .values_list('value', flat=True)
+                        .first()
+                    )
+                    return (v or 'deen').strip() or 'deen'
+                except Exception:
+                    pass
+            md = getattr(subevent, 'meta_data', None) or {}
+            if isinstance(md, dict) and 'congressschedule_language' in md:
+                return (md.get('congressschedule_language') or 'deen')
+            se_settings = getattr(subevent, 'settings', None)
+            try:
+                return se_settings.get('congressschedule_language', 'deen') if se_settings is not None else 'deen'
+            except Exception:
+                return 'deen'
+
+        for day_index, (day_date, rooms) in enumerate(sorted(days.items()), start=1):
+            starts = [se.date_from for r in rooms.values() for se in r if se.date_from]
+            ends = [se.date_to for r in rooms.values() for se in r if se.date_to]
+            day_start = min(starts).isoformat() if starts else None
+            day_end = (max(ends).isoformat() if ends else (min(starts).isoformat() if starts else None))
+
+            day_obj = {
+                "index": day_index,
+                "date": day_date.isoformat() if day_date else None,
+                "start": day_start,
+                "end": day_end,
+                "rooms": []
+            }
+
+            for room_name, events_in_room in sorted(rooms.items(), key=lambda x: x[0].lower()):
+                room_obj = {
+                    "name": room_name,
+                    "guid": str(uuid.uuid5(uuid.NAMESPACE_DNS, f"room:{organizer}:{event}:{room_name}")),
+                    "events": []
+                }
+
+                for se in sorted(events_in_room, key=lambda s: s.date_from or 0):
+                    dur_txt = '00:00'
+                    if se.date_from and se.date_to and se.date_to >= se.date_from:
+                        delta = se.date_to - se.date_from
+                        total_seconds = int(delta.total_seconds())
+                        hours = total_seconds // 3600
+                        minutes = (total_seconds % 3600) // 60
+                        seconds = total_seconds % 60
+                        dur_txt = f"{hours:02d}:{minutes:02d}" if seconds == 0 else f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+                    title = _localize(se.name)
+                    base = f"{organizer}_{event}".lower()
+                    second = slugify(title)
+                    if len(second) < 4:
+                        second = f"{second}-{se.pk}"
+
+                    lang = _get_lang(se)
+
+                    ev_obj = {
+                        "id": se.pk,
+                        "guid": str(uuid.uuid5(uuid.NAMESPACE_DNS, f"subevent:{ev.pk}:{se.pk}")),
+                        "room": room_name,
+                        "title": title,
+                        "subtitle": "",
+                        "type": "subevent",
+                        "date": se.date_from.isoformat() if se.date_from else None,
+                        "start": se.date_from.strftime('%H:%M') if se.date_from else None,
+                        "duration": dur_txt,
+                        "abstract": "",
+                        "slug": f"{base}-{second}",
+                        "track": slugify(room_name) or "general",
+                        "language": str(lang or "deen"),
+                    }
+                    room_obj["events"].append(ev_obj)
+
+                day_obj["rooms"].append(room_obj)
+
+            schedule["days"].append(day_obj)
+
+        return HttpResponse(
+            json.dumps(schedule, ensure_ascii=False),
+            content_type='application/json; charset=utf-8'
+        )
+
 
 class HackertoursMarkdownView(views.APIView):
     def get(self, request, organizer, event, *args, **kwargs):
