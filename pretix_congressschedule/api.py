@@ -240,24 +240,19 @@ class CongressScheduleJSONView(views.APIView):
         subs = SubEvent.objects.filter(event=ev).order_by('date_from')
 
         schedule = {
-            "generator": {"name": "pretix-congressschedule", "version": __version__},
-            "url": None,
+            "generator": {"name": "voc/schedule/hackertours", "version": __version__},
             "version": f"{ev.slug}-v1",
             "conference": {
-                "title": (ev.name.localize(ev.settings.locale) if hasattr(ev.name, 'localize') else str(ev.name)) or str(ev.slug),
                 "acronym": f"{organizer}_{event}".lower(),
+                "title": (ev.name.localize(ev.settings.locale) if hasattr(ev.name, 'localize') else str(ev.name)) or str(ev.slug),
                 "start": None,
                 "end": None,
-                "days": None,
-                "time_zone_name": None,
+                "daysCount": None,
+                "timeslot_duration": "00:15",
+                "time_zone_name": "Europe/Berlin",
             },
             "days": []
         }
-
-        try:
-            schedule["url"] = request.build_absolute_uri()
-        except Exception:
-            pass
 
         all_starts = [se.date_from for se in subs if se.date_from]
         all_ends = [se.date_to for se in subs if se.date_to]
@@ -339,17 +334,15 @@ class CongressScheduleJSONView(views.APIView):
             day_obj = {
                 "index": day_index,
                 "date": day_date.isoformat() if day_date else None,
-                "start": day_start,
-                "end": day_end,
+                "day_start": day_start,
+                "day_end": day_end,
                 "rooms": []
             }
 
+            day_obj["rooms"] = {}
+
             for room_name, events_in_room in sorted(rooms.items(), key=lambda x: x[0].lower()):
-                room_obj = {
-                    "name": room_name,
-                    "guid": str(uuid.uuid5(uuid.NAMESPACE_DNS, f"room:{organizer}:{event}:{room_name}")),
-                    "events": []
-                }
+                room_events = []
 
                 for se in sorted(events_in_room, key=lambda s: s.date_from or 0):
                     dur_txt = '00:00'
@@ -372,21 +365,29 @@ class CongressScheduleJSONView(views.APIView):
                     ev_obj = {
                         "id": se.pk,
                         "guid": str(uuid.uuid5(uuid.NAMESPACE_DNS, f"subevent:{ev.pk}:{se.pk}")),
-                        "room": room_name,
-                        "title": title,
-                        "subtitle": "",
-                        "type": "subevent",
                         "date": se.date_from.isoformat() if se.date_from else None,
                         "start": se.date_from.strftime('%H:%M') if se.date_from else None,
                         "duration": dur_txt,
-                        "abstract": "",
+                        "room": room_name,
                         "slug": f"{base}-{second}",
-                        "track": slugify(room_name) or "general",
-                        "language": str(lang or "deen"),
+                        "url": "TODO",
+                        "title": title,
+                        "subtitle": "",
+                        "track": "Hackertours",
+                        "type": "Tour",
+                        "language": str(lang or "de, en"),
+                        "abstract": se.description.localize(ev.settings.locale) if hasattr(se.description, 'localize') else str(se.description) or "",
+                        "persons": [],
+                        "links": [
+                            {
+                                "url": "TODO",
+                                "title": "TODO",
+                            }
+                        ],
                     }
-                    room_obj["events"].append(ev_obj)
+                    room_events.append(ev_obj)
 
-                day_obj["rooms"].append(room_obj)
+                day_obj["rooms"][room_name] = room_events
 
             schedule["days"].append(day_obj)
 
@@ -394,7 +395,6 @@ class CongressScheduleJSONView(views.APIView):
             json.dumps(schedule, ensure_ascii=False),
             content_type='application/json; charset=utf-8'
         )
-
 
 class HackertoursMarkdownView(views.APIView):
     def get(self, request, organizer, event, *args, **kwargs):
