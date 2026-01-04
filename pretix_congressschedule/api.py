@@ -376,7 +376,7 @@ class CongressScheduleJSONView(views.APIView):
                         "track": "Hackertours",
                         "type": "Tour",
                         "language": str(lang or "de, en"),
-                        "abstract": se.description.localize(ev.settings.locale) if hasattr(se.description, 'localize') else str(se.description) or "",
+                        "abstract": se.frontpage_text.localize(ev.settings.locale) if hasattr(se.frontpage_text, 'localize') else str(se.frontpage_text) if se.frontpage_text else "",
                         "persons": [],
                         "links": [
                             {
