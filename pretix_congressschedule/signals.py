@@ -8,6 +8,16 @@ except Exception:  # pragma: no cover - during docs build or without pretix
 
 
 class SubEventHackertoursForm(forms.Form):
+	contactAtVenueName = forms.CharField(
+		label=_("Name of contact at Venue (internal)"),
+		required=False,
+		help_text=_("Prefered name of the contact person at the venue, not the Hackertours-internal team member organizing the tour. (This is never shown publicly.)"),
+	)
+	contactAtVenuePhoneNumber = forms.CharField(
+		label=_("Phone Number of contact at Venue (internal)"),
+		required=False,
+		help_text=_("Phone number of the contact person at the venue. Prefer mobile numbers over landlines. (This is never shown publicly.)"),
+	)
 	language = forms.ChoiceField(
 		label=_("Language"),
 		required=False,
@@ -35,6 +45,21 @@ class SubEventHackertoursForm(forms.Form):
 		super().__init__(*args, **kwargs)
 		# Pre-fill from subevent meta if available
 		if self.subevent:
+			contactAtVenueNameValue = (
+				SubEventMetaValue.objects
+				.filter(subevent=self.subevent, property__name='congressschedule_contact_at_venue_name')
+				.values_list('value', flat=True)
+				.first()
+			)
+			self.fields['contactAtVenueName'].initial = contactAtVenueNameValue or ''
+			contactAtVenuePhoneNumberValue = (
+				SubEventMetaValue.objects
+				.filter(subevent=self.subevent, property__name='congressschedule_contact_at_venue_phone_number')
+				.values_list('value', flat=True)
+				.first()
+			)
+			self.fields['contactAtVenuePhoneNumber'].initial = contactAtVenuePhoneNumberValue or ''
+
 			languageValue = (
 				SubEventMetaValue.objects
 				.filter(subevent=self.subevent, property__name='congressschedule_language')
@@ -42,6 +67,7 @@ class SubEventHackertoursForm(forms.Form):
 				.first()
 			)
 			self.fields['language'].initial = languageValue or ''
+
 			websiteENValue = (
 				SubEventMetaValue.objects
 				.filter(subevent=self.subevent, property__name='congressschedule_website_en')
@@ -49,6 +75,7 @@ class SubEventHackertoursForm(forms.Form):
 				.first()
 			)
 			self.fields['website_en'].initial = websiteENValue or ''
+			
 			websiteDEValue = (
 				SubEventMetaValue.objects
 				.filter(subevent=self.subevent, property__name='congressschedule_website_de')
@@ -58,6 +85,8 @@ class SubEventHackertoursForm(forms.Form):
 			self.fields['website_de'].initial = websiteDEValue or ''
 		elif self.subevent and hasattr(self.subevent, 'settings'):
 			# Fallback (older pretix): might be event-wide, keep as last resort
+			self.fields['contact_at_venue_name'].initial = self.subevent.settings.get('congressschedule_contact_at_venue_name', '')
+			self.fields['contact_at_venue_phone_number'].initial = self.subevent.settings.get('congressschedule_contact_at_venue_phone_number', '')
 			self.fields['language'].initial = "deen"
 			self.fields['website_en'].initial = ""
 			self.fields['website_de'].initial = ""
@@ -68,13 +97,33 @@ class SubEventHackertoursForm(forms.Form):
 
 	def save(self):
 		if not self.subevent:
-			return
-		languageValue = (self.cleaned_data.get('language') or '').strip() or 'deen'
-		websiteENValue = (self.cleaned_data.get('website_en') or '').strip()
-		websiteDEValue = (self.cleaned_data.get('website_de') or '').strip()		
+			return	
 		# Persist as real subevent meta value so it's scoped per subevent
 		from pretix.base.models import EventMetaProperty
 
+		contactAtVenueNameValue = (self.cleaned_data.get('contactAtVenueName') or '').strip()
+		contactAtVenueNamePropertyObj, _ = EventMetaProperty.objects.get_or_create(
+			name='congressschedule_contact_at_venue_name',
+			defaults={'default': '', 'organizer': self.event.organizer}
+		)
+		SubEventMetaValue.objects.update_or_create(
+			subevent=self.subevent,
+			property=contactAtVenueNamePropertyObj,
+			defaults={'value': contactAtVenueNameValue},
+		)
+
+		contactAtVenuePhoneNumberValue = (self.cleaned_data.get('contactAtVenuePhoneNumber') or '').strip()
+		contactAtVenuePhoneNumberPropertyObj, _ = EventMetaProperty.objects.get_or_create(
+			name='congressschedule_contact_at_venue_phone_number',
+			defaults={'default': '', 'organizer': self.event.organizer}
+		)
+		SubEventMetaValue.objects.update_or_create(
+			subevent=self.subevent,
+			property=contactAtVenuePhoneNumberPropertyObj,
+			defaults={'value': contactAtVenuePhoneNumberValue},
+		)
+
+		languageValue = (self.cleaned_data.get('language') or '').strip() or 'deen'
 		language_property_obj, _ = EventMetaProperty.objects.get_or_create(
 			name='congressschedule_language',
 			defaults={'default': '', 'organizer': self.event.organizer}
@@ -85,6 +134,7 @@ class SubEventHackertoursForm(forms.Form):
 			defaults={'value': languageValue},
 		)
 
+		websiteENValue = (self.cleaned_data.get('website_en') or '').strip()
 		website_en_property_obj, _ = EventMetaProperty.objects.get_or_create(
 			name='congressschedule_website_en',
 			defaults={'default': '', 'organizer': self.event.organizer}
@@ -95,6 +145,7 @@ class SubEventHackertoursForm(forms.Form):
 			defaults={'value': websiteENValue},
 		)
 
+		websiteDEValue = (self.cleaned_data.get('website_de') or '').strip()	
 		website_de_property_obj, _ = EventMetaProperty.objects.get_or_create(
 			name='congressschedule_website_de',
 			defaults={'default': '', 'organizer': self.event.organizer}
