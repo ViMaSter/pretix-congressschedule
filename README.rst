@@ -66,6 +66,12 @@ Development setup
 Changelog
 ---------
 
+2.0.0
+~~~~~
+
+- Removes XML endpoint (breaking)
+- Replaces language section with "Hackertours Settings" section containing language of tour and links for English and German tour details
+
 1.1.1
 ~~~~~
 
