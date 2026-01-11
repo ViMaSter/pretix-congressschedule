@@ -1,7 +1,7 @@
 pretix-congressschedule
 =======================
 
-This is a plugin for `pretix`_. It generates a `c3voc-schema`_ compatible `schedule.xml` endpoint and hackertours-compatible markdown table for event-series.
+This is a plugin for `pretix`_. It generates a `c3voc-schema`_ compatible `schedule.json` endpoint and hackertours-compatible markdown table for event-series.
 To access the endpoints without logging in, generate an `API token`_ first.
 
 Subevent language field
@@ -10,14 +10,14 @@ Subevent language field
 To determine a subevent's language, this plugin adds a language dropdown selector.
 Default: `deen` (multi-lingual of German and English)
 
-Accessing schedule.xml
+Accessing schedule.json
 ----------------------
 
 1. Create an `event-series`_ in pretix; a singular event or non-event shop will not work, as products won't have required start and end times associated with them
 
-2. Visit `/api/v1/event/{organizationSlug}/{eventSlug}/schedule.xml` and replace `{organizationSlug}` and `{eventSlug}` with the respective slugs
+2. Visit `/api/v1/event/{organizationSlug}/{eventSlug}/schedule.xmjsonl` and replace `{organizationSlug}` and `{eventSlug}` with the respective slugs
 
-3. Receive either a 200 status code with an XML document adhering to `schedule.xml.xsd`_ or a 400 error code with additional information inside `<error>`
+3. Receive either a 200 status code with an JSON document adhering to `https://c3voc.de/schedule/schema.json`_ or a 400 error code with additional information inside `<error>`
 
 
 Using schedule.md
@@ -69,7 +69,7 @@ Changelog
 2.0.0
 ~~~~~
 
-- Removes XML endpoint (breaking)
+- Replaces XML endpoint (breaking) with JSON endpoint
 - Replaces language section with "Hackertours Settings" section containing language of tour and links for English and German tour details
 
 1.1.1
@@ -100,6 +100,5 @@ Released under the terms of the Apache License 2.0
 .. _pretix: https://github.com/pretix/pretix
 .. _pretix development setup: https://docs.pretix.eu/en/latest/development/setup.html
 .. _API token: https://docs.pretix.eu/dev/api/tokenauth.html#obtaining-an-api-token
-.. _c3voc-schema: https://c3voc.de/wiki/schedule#schedule_xml
-.. _schedule.xml.xsd: https://c3voc.de/schedule/schema.xsd
+.. _c3voc-schema: https://c3voc.de/wiki/schedule#interexchange_json
 .. _event-series: https://docs.pretix.eu/guides/event-series/?h=dates#how-to-create-an-event-series
